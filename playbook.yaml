@@ -1,0 +1,39 @@
+- name: K3S installation
+  hosts: raspberry
+  tasks:
+    - name: Enable container features
+      become: true
+      replace:
+        path: /boot/firmware/cmdline.txt
+        regexp: '^([\w](?!.*\b{{ item }}\b).*)$'
+        replace: '\1 {{ item }}'
+      with_items:
+      - "cgroup_enable=cpuset"
+      - "cgroup_memory=1"
+      - "cgroup_enable=memory"
+
+    - name: Reboot the system
+      become: true
+      ansible.builtin.reboot:
+        msg: "Rebooting the system"
+        connect_timeout: 5
+    
+    - name: Download k3s installer
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: /tmp/k3s-installer.sh
+        mode: '0755'
+
+    - name: Run k3s installer
+      become: true
+      ansible.builtin.shell:
+        cmd: /tmp/k3s-installer.sh
+      environment:
+        INSTALL_K3S_EXEC: "server --cluster-init"
+
+    - name: Start k3s service
+      become: true
+      ansible.builtin.systemd:
+        name: k3s
+        state: started
+        enabled: true
